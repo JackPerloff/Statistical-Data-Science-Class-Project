@@ -1,0 +1,193 @@
+---
+title: "Relationship Between TIF Balances and The Yearly Proportion of Robbery Victims to Violent Crime Victims in Chicago from 2001 - 2014"
+output: html_document
+subtitle: 'By: Judy, Kendall, and Jack'
+---
+
+# Introduction
+
+> The relationship between economic conditions and crime is an important social phenomenon that has broad implications for governments and businesses. Our question is: Is there evidence for a relationship between the yearly proportion of victims of robbery to general violent crime victims and yearly Tax Increment Financing (TIF) balances in the city of Chicago between the years 2001 and 2014? In this project, we choose Chicago as a subset of the larger US due to the city's ongoing problems with high crime rates. We find evidence for a strong positive relationship between this proportion and yearly TIF balances, indicating that the city government may be trying to encourage economic development in response to the elevated prevalence of property crimes such as robbery.
+
+# Background
+
+> In this study, we introduce two different datasets, both provided by the City of Chicago. The first dataset, "Violence Reduction - Victim Demographics - Aggregated", contains 52,297 rows, each consisting of a specific set of demographic information. The dataset is updated daily based on the reports to the Chicago Police Department. The second dataset, "TIF Balances Fiscal Year - 2001-2014", contains 4,139 rows. Each row of the dataset represents either the beginning balance or ending balance of a specific TIF in a specific year. However, we are only interested in the ending TIF balance of each fiscal year, which is the twelve-month financial period that businesses and governments use for financial and tax reporting purposes. Additionally, we aggregate the ending TIF balances for each year to give us an idea of how much the city government is putting into these funds yearly. Tax Increment Financing (TIF) is a financing method commonly used by city governments to fund development projects. Essentially, a certain portion of property taxes in a designated development zone are diverted from the city's general fund to a separate fund which is used to subsidize development projects in that zone. In the victim dataset, "TIME_PERIOD" contains a string that indicates the quarter of each year, where it is grouped by: January -- March, April -- June, July -- September, October -- December. "TIME_PERIOD_START" indicates the year/month/date of the quarter begins. "TIME_PERIOD_END" indicates the time when the quarter ends. "PRIMARY_TYPE" indicates the type of the crime, where there are six crime types selected by the the FBI; and "NUMBER_OF_VICTIMS" indicates the number of victims of this type of crime corresponding to the demographic conditions, time period, and nature of the crime laid out in each row. In the TIF dataset, "Fiscal Year" indicates the fiscal year, "TIF Number" and "TIF Name" indicate the designated TIF zone in the city of Chicago, "Period" indicates if the balance is from the beginning or end of the fiscal year, and "Balance" indicates the balance, in dollars, of the specific TIF. There are two unusual features in the victim dataset that may affect the interpretation of the result. First, any row where there were fewer than three incidents has been deleted to help prevent re-identification of victims. Second, between 1991 to 2001, the data only includes homicides. However, the TIF dataset only includes data for the time period from 2001 to 2014, so we will filter out the victim data prior to 2001. In this project, we want to conclude if there is a relationship between the high robbery victim proportion compared to the sum of total victims each year and the TIF balances over time. A positive relationship could indicate that the city government wants to encourage economic development as a response to the issue of robberies. If there is a negative relationship, that could be explained by high crime discouraging the government from relinquishing property taxes for development purposes. No relationship would indicate that these variables do not have a relationship. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      error = TRUE, fig.height = 4)
+library(tidyverse)
+library(kableExtra)
+
+source("../scripts/viridis.R")
+source("../scripts/ggprob.R")
+
+```
+
+```{r, include = FALSE}
+victim_data = read_csv('../project/victim_data.csv')
+
+victim_data
+```
+
+```{r, include = FALSE}
+tif_data = read_csv('../project/tif_data.csv')
+
+tif_data
+```
+
+```{r, include = FALSE}
+tif_data_sum = tif_data %>% 
+  filter(Period == 'Ending Balance') %>% 
+  rename(year = 'Fiscal Year') %>% 
+  group_by(year) %>% 
+  summarize(yearly_tif_balance = sum(Amount))
+
+tif_data_sum
+```
+
+# Useful Graphs
+
+> This graph illustrates the Tax Increment Financing (TIF) balances from 2001 to 2014 in Chicago. The earliest balance is approximately \$420,000,000, the maximum balance is approximately \$17,300,000,000 in 2010, and the latest balance is \$14,600,000,000. Ultimately, we can see the general upward trend of the amount of money allocated in TIF balances each year.
+
+```{r, echo = FALSE}
+ggplot(tif_data_sum, aes(x = year, 
+                         y = yearly_tif_balance / 1e6)) +
+  geom_line() + 
+  ggtitle('TIF Balances Over Time', 
+          subtitle = 'City of Chicago, 2001 - 2014') + 
+  xlab('Year') + 
+  ylab('Amount, in millions of dollars ($)') + 
+  scale_y_continuous(labels = scales::comma)
+```
+
+```{r, include = FALSE}
+victim_data_filtered = victim_data %>% 
+  mutate(year = as.integer(str_sub(TIME_PERIOD_END, 7, 10))) %>%
+  filter(year >= 2001 & year <= 2014)
+
+victim_data_sum = victim_data_filtered %>% 
+  group_by(year, PRIMARY_TYPE) %>% 
+  summarize(type_total = sum(NUMBER_OF_VICTIMS)) %>%  
+  group_by(year) %>%
+  mutate(proportion = type_total / sum(type_total))
+
+victim_data_sum
+```
+
+> In the following graph, each line represents a proportion of a specific violent crime type's victims to the total victims of all violent crimes. While the trend lines of each crime do not fluctuate significantly over time, they all have slight upward or downward trends. We can see that robbery maintains the highest proportion of violent crime victims across all years.
+
+```{r, echo = FALSE}
+ggplot(victim_data_sum, aes(x = year, 
+                            y = proportion, 
+                            color = PRIMARY_TYPE)) + 
+  geom_line() + 
+  ggtitle('Proportions of Each Violent Crime Type to Total Violent Crime Victims Over Time', 
+          subtitle = 'City of Chicago, 2001 - 2014') +
+  xlab('Year') + 
+  ylab('Proportion') + 
+  labs(color = 'Violent Crime Type')
+```
+
+```{r, include = FALSE}
+robbery_prop_over_time = victim_data_sum %>% 
+  filter(PRIMARY_TYPE == 'ROBBERY') %>% 
+  select(year, proportion)
+
+robbery_prop_over_time
+```
+
+> The following graph isolates the proportion of robbery over time, conveying more distinctly the change in this proportion over time. 
+
+```{r, echo = FALSE}
+ggplot(robbery_prop_over_time, aes(x = year, 
+                                   y = proportion)) +
+  geom_line(color = 'navyblue') + 
+  ggtitle('Proportion of Robbery Victims to Total Violent Crime Victims Over Time', 
+          subtitle = 'City of Chicago, 2001 - 2014') +
+  xlab('Year') + 
+  ylab('Proportion')
+```
+
+```{r, include = FALSE}
+combined_data = full_join(robbery_prop_over_time, tif_data_sum)
+
+print(combined_data)
+
+data_lm = lm(proportion ~ yearly_tif_balance, data = combined_data)
+cf = coef(data_lm)
+cf
+
+summary(data_lm)
+```
+
+# Calculating the Correlation Coefficient
+
+> These two variables - Yearly TIF Balances and Proportion of Robbery Victims to Total Violent Crime Victims - have a correlation coefficient (r) equal to about 0.82. This indicates a strong positive correlation between the variables.
+
+```{r, include = FALSE}
+x = combined_data$yearly_tif_balance
+y = combined_data$proportion
+xbar = mean(x)
+ybar = mean(y)
+sx = sd(x)
+sy = sd(y)
+r = cor(x,y)
+print(r)
+```
+
+```{r, include = FALSE}
+b1 = r * sy/sx
+b0 = ybar - b1 * xbar
+c(b0, b1)
+
+cf
+```
+
+# Hypothesis Testing
+
+### Model Equation
+> The following equation is a generalized model for linear regression: $$Y = B_0 + B_1*X$$ where $B_0$ is the intercept and $B_1$ is the slope of the model. The parameter of interest is $B_1$.
+
+### Hypotheses: 
+> Null Hypothesis: $$H_0: B_1 = 0$$ Alternative Hypothesis: $$H_a: B_1 \neq 0$$ We test the null that our slope, $B_1$, is 0, which would suggest that there is not a linear relationship between yearly TIF balances and the yearly proportion of robbery victims to total violent crime victims.
+
+### Calculating the Test Statistic
+> Next, we calculate the test statistic. For linear regression, this looks like: $$T = \frac {\hat{B_1} - 0} {SE_{\hat{B_1}}} ～ t(n-2)$$
+where $\hat{B_1}$ is the estimated slope and $SE_{\hat{B_1}}$ is the standard error of the estimated slope. The 0 comes from the null hypothesis assumption that $B_1$ = 0. Our estimated slope is about 3.64e-11, and the standard error of this estimate is about 7.33e-12. Therefore, our calculated test statistic is about 4.97. So, $T = 4.97.$
+
+### Calculating the P-Value
+> In this scenario, we have a t-distribution with $n-2$ degrees of freedom because we assume that the errors of our model are normally distributed and because our model has 2 parameters, the slope and the intercept. We subtract these 2 estimated parameters from the number of observations in the dataset, 14. Thus, we have 12 degrees of freedom. 
+
+> With the t-statistic equalling 4.97 and the degrees of freedom equalling 12, the p-value equals about 0.000325. Because the p-value is less than 0.05, there is strong evidence against the null hypothesis: that $B_1 = 0.$ Based on this evidence, we reject the null hypothesis and adopt the alternative: that $B_1 \neq 0.$ In context, this means that there is strong evidence that there is a relationship between yearly TIF balances and the yearly proportion of robbery victims to total violent crime victims. 
+
+### Visualizing the Correlation
+> The following graph shows the relationship between Yearly TIF Balances and the Proportion of Robbery Victims to Total Violent Crime Victims. In general, as the Yearly TIF Balance increases, the Proportion of Robbery increases as well. This indicates a positive relationship between our variables. A line of best fit is also included in the graph, with a slope and y-intercept consistent with what we calculated using the data.
+
+```{r, echo = FALSE}
+ggplot(combined_data, aes(x = yearly_tif_balance/1e6, 
+                          y = proportion)) + 
+  geom_point() + 
+  geom_smooth(method = 'lm', 
+              color = 'red', 
+              se = FALSE) +
+  ggtitle('Robbery Proportion Graphed Against Yearly TIF Balance', 
+          subtitle = 'City of Chicago, 2001 - 2014') +
+  xlab('Yearly TIF Balance, in millions of dollars ($)') +
+  ylab('Proportion') +
+  scale_x_continuous(labels = scales::comma)
+```
+
+# Analysis
+
+> There has been a general increase in the proportion of robbery victims compared to other violent crimes from 2001 to 2014. During the same period, yearly Tax Increment Financing (TIF) balances have consistently risen. The robust positive trend in both variables is substantiated by a calculated correlation coefficient of r = 0.82. Moreover, through a two-sided hypothesis test of our slope parameter which resulted in a p-value of 0.000325 (less than 0.05), we reject the null hypothesis - that the slope of the linear relationship between our two variables is 0 - and adopt the alternative hypothesis - that the slope is not zero. We estimate the slope of this relationship to be about 3.64e-11, which indicates a positive linear relationship between our variables.
+
+# Discussion
+
+> Our results suggest a noteworthy association between economic development and violent crime patterns, specifically in the context of robbery. Potential short-comings of our analysis are subject to the lack of data on the number of specific occurrences of each type of crime. In turn, we use the number of victims per each crime. However, The drawback of this method is the likelihood of one occurrence having multiple victims. This could lead to outliers; however, extreme cases are likely rare and this short-coming should not significantly affect our result. Another potential drawback of our analysis is that we decided to look at the proportion of robbery victims to violent crime victims. This could limit our analysis because the proportion of robbery victims does not indicate how many robbery victims there are per year: it indicates the number of robbery victims compared to victims of all violent crimes. This means that there could be a year where the number of robbery victims decreases but the proportion of robbery victims increases because the number of victims of other types of violent crime decreased even more substantially. We justify our use of the proportion of robbery victims because we view it as an indicator of the relative prevalence of robbery in the city: if robbery's relative prevalence is increasing in Chicago, the city government should probably devote more resources to addressing it. Another important limitation stems from the nature of TIF in general. TIF balances are determined by forgone property taxes, meaning that the TIF balances are directly impacted by two things: the property tax rate and property values. If the city decided to change the property tax rate, that would have an effect on the amount of forgone tax revenue. Fluctuations in the economy will also have an effect on forgone property tax revenues by impacting property values. Housing prices in the US started decreasing around 2007, which eventually led to a financial crisis and an economic recession around 2008. These events caused property values in the City of Chicago (and the rest of the country) to decrease, leading to changes in the amount of forgone property tax revenue by the city government. These factors limit our ability to point to crime as a potential cause for why the TIF balances change over time. 
+
+> Looking ahead, there are various potential directions for future analysis. Our initial focus would be to examine the number of occurrences of robbery and other crimes as opposed to the number of victims. Furthermore, we refined our data to consider the proportion of robbery to other crimes, allowing the possibility of running similar analyses on the proportions of other crime types individually. Lastly, valuable exploration involves comparing predicted TIF balances in the years 2015-2023, generated via linear model, with the actual TIF balances. In order to investigate these future analyses, acquiring additional data for both variables is essential.
+
+# References
+> Link to TIF Data: https://data.cityofchicago.org/Community-Economic-Development/TIF-Balances-by-Fiscal-Year-2001-2014/hz8p-ewk5/about_data 
+
+> Link to Violent Crime Data: https://data.cityofchicago.org/Public-Safety/Violence-Reduction-Victim-Demographics-Aggregated/gj7a-742p/about_data
